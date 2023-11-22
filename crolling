@@ -1,12 +1,13 @@
 import nest_asyncio
-nest_asyncio.apply()
-
 import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import nltk
+import csv
+
+nest_asyncio.apply()
 
 # nltk 라이브러리에서 불용어 다운로드
 nltk.download('stopwords')
@@ -49,14 +50,21 @@ async def scrape_arxiv(page):
                 all_abstracts.append("Abstract not found on the page.")
 
 async def main():
-    tasks = [scrape_arxiv(page) for page in range(1, 6)]  # 예시로 5페이지까지 비동기로 크롤링
+    page = 1
     
-    # 비동기로 페이지 요청
-    await asyncio.gather(*tasks)
+    while True:
+        await scrape_arxiv(page)
+        page += 1
+
+        # 전체 페이지 크롤링
+        if page > 100:  # 예시로 100페이지까지 크롤링
+            break
 
 # 비동기 코드 실행
 await main()
 
-# 결과 출력
-for idx, abstract in enumerate(all_abstracts, start=1):
-    print(f"Filtered Abstract {idx}:", abstract)
+# 결과를 CSV 파일로 저장
+with open('filtered_abstracts.csv', 'w', newline='', encoding='utf-8') as csvfile:
+    csv_writer = csv.writer(csvfile)
+    csv_writer.writerow(['Filtered Abstract'])
+    csv_writer.writerows([[abstract] for abstract in all_abstracts])
