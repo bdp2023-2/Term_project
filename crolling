@@ -2,22 +2,12 @@ import nest_asyncio
 import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-import nltk
 import csv
 
 nest_asyncio.apply()
 
-# nltk 라이브러리에서 불용어 다운로드
-nltk.download('stopwords')
-nltk.download('punkt')
-
-# 불용어 리스트
-stop_words = set(stopwords.words('english'))
-
 # 논문 정보를 저장할 리스트
-all_abstracts = []
+all_papers = []
 
 async def fetch_page(session, url):
     async with session.get(url) as response:
@@ -30,24 +20,28 @@ async def scrape_arxiv(page):
         response = await fetch_page(session, url)
         
         soup = BeautifulSoup(response, 'html.parser')
-        paper_links = soup.find_all('p', class_='list-title is-inline-block')
+        paper_links = soup.find_all('li', class_='arxiv-result')
         
         for link in paper_links:
-            paper_url = link.a['href']
-            paper_response = await fetch_page(session, paper_url)
-            paper_soup = BeautifulSoup(paper_response, 'html.parser')
-            abstract_tag = paper_soup.find('blockquote', class_='abstract mathjax')
+            # 제목
+            title_tag = link.find('p', class_='title is-5 mathjax')
+            title = title_tag.get_text(separator=' ', strip=True) if title_tag else "Title not found"
             
-            if abstract_tag:
-                abstract_text = abstract_tag.get_text(separator=' ', strip=True)
-                
-                # 불용어 처리
-                words = word_tokenize(abstract_text)
-                filtered_abstract = ' '.join([word for word in words if word.lower() not in stop_words])
-                
-                all_abstracts.append(filtered_abstract)
-            else:
-                all_abstracts.append("Abstract not found on the page.")
+            # 저자
+            authors_tag = link.find('p', class_='authors')
+            authors = authors_tag.get_text(separator=' ', strip=True) if authors_tag else "Authors not found"
+            
+            # 초록
+            abstract_tag = link.find('p', class_='abstract mathjax')
+            abstract = abstract_tag.get_text(separator=' ', strip=True) if abstract_tag else "Abstract not found"
+            
+            # 날짜
+            date_tag = link.find('p', class_='is-size-7')
+            date = date_tag.get_text(separator=' ', strip=True) if date_tag else "Date not found"
+            
+            # 각 논문 정보를 리스트에 저장
+            paper_info = [title, authors, abstract, date]
+            all_papers.append(paper_info)
 
 async def main():
     page = 1
@@ -64,7 +58,11 @@ async def main():
 await main()
 
 # 결과를 CSV 파일로 저장
-with open('filtered_abstracts.csv', 'w', newline='', encoding='utf-8') as csvfile:
+with open('arxiv_papers3.csv', 'w', newline='', encoding='utf-8') as csvfile:
     csv_writer = csv.writer(csvfile)
-    csv_writer.writerow(['Filtered Abstract'])
-    csv_writer.writerows([[abstract] for abstract in all_abstracts])
+    
+    # 헤더 추가
+    csv_writer.writerow(["Title", "Authors", "Abstract", "Date"])
+    
+    # 논문 정보 쓰기
+    csv_writer.writerows(all_papers)
